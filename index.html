@@ -1,132 +1,311 @@
 <!DOCTYPE html>
-<html>
+<html lang="th">
 <head>
-<meta charset="UTF-8">
-<title>LangLeap</title>
-
-<style>
-    body {
-        font-family: sans-serif;
-        background: #111;
-        color: #fff;
-        margin: 0;
-        text-align: center;
+  <meta charset="utf-8" />
+  <!-- สำคัญมากสำหรับมือถือ -->
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LangLeap</title>
+  <style>
+    :root{
+      --bg:#0b0f14;
+      --card:#0f1720;
+      --accent:#00c8ff;
+      --accent2:#ffa600;
+      --muted:#a9b3bd;
+      --danger:#ff5252;
+      --radius:12px;
     }
 
-    h1 { margin-top: 40px; }
+    /* --- พื้นฐาน --- */
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial;background:var(--bg);color:#fff}
+    .app{min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:18px 12px 100px}
 
-    /* ปุ่ม Add และ History แบบวงกลม */
-    .floating-btn {
-        width: 55px;
-        height: 55px;
-        border-radius: 50%;
-        border: none;
-        cursor: pointer;
-        font-size: 14px;
-        background: #00c8ff;
-        color: black;
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
-        transition: 0.3s;
+    h1{margin:28px 0 6px;font-size:20px}
+    p.lead{margin:0;color:var(--muted);font-size:14px}
+
+    /* --- ปุ่มวงกลม (มุมบน) --- */
+    .floating {
+      position:fixed;
+      top:12px;
+      width:48px;
+      height:48px;
+      border-radius:50%;
+      border:0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-weight:600;
+      cursor:pointer;
+      box-shadow:0 6px 18px rgba(0,0,0,.6);
+      -webkit-tap-highlight-color: transparent;
     }
-    .floating-btn:hover { transform: scale(1.1); }
-
-    /* ปุ่ม History จะอยู่มุมซ้าย */
-    #historyBtn {
-        right: auto;
-        left: 20px;
-        background:#ffa600;
+    /* Add: มุมขวา */
+    #btnAdd {
+      right:12px;
+      background:var(--accent);
+      color:#000;
+    }
+    /* History: มุมซ้าย */
+    #btnHistory {
+      left:12px;
+      background:var(--accent2);
+      color:#000;
     }
 
-    /* กล่องหน้า Add และ History (ซ้อนทับหน้าเว็บ) */
+    /* ไอคอน text เล็กลงในปุ่ม */
+    .floating .ico { font-size:14px; line-height:1; }
+
+    /* --- Overlay (หน้า Add / History) --- */
     .overlay {
-        display:none;
-        position: fixed;
-        inset: 0;
-        background: rgba(0,0,0,.9);
-        backdrop-filter: blur(3px);
-        padding-top: 100px;
+      position:fixed; inset:0;
+      display:none; /* แสดงเมื่อเปิด */
+      background: linear-gradient(180deg, rgba(2,6,12,0.86), rgba(2,6,12,0.94));
+      z-index:60;
+      padding:20px;
+      overflow:auto;
+      -webkit-overflow-scrolling:touch;
     }
-    .box {
-        background:#222;
-        width: 90%;
-        max-width: 450px;
-        margin:auto;
-        padding:20px;
-        border-radius:15px;
+    .panel {
+      max-width:720px;
+      margin:12vh auto 48px; /* ให้ดูเป็นกล่องกลางจอบนมือถือ */
+      background:var(--card);
+      border-radius:var(--radius);
+      padding:18px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.6);
     }
+    .panel h2{margin:0 0 12px;font-size:18px}
+    .row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+    input[type="text"]{
+      width:100%;
+      padding:12px 14px;border-radius:10px;border:1px solid rgba(255,255,255,0.06);
+      background:transparent;color:#fff;font-size:16px;margin-bottom:10px;
+    }
+    .btn {
+      padding:10px 14px;border-radius:10px;border:0;font-size:15px;cursor:pointer;
+    }
+    .btn.primary{background:var(--accent);color:#000;font-weight:700}
+    .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted)}
 
-    input, button {
-        padding:10px;
-        width:80%;
-        margin:5px;
-        border-radius:5px;
-        border:none;
-        font-size:16px;
+    /* รายการ history */
+    .list{max-height:360px;overflow:auto;padding-right:6px}
+    .item{padding:10px;border-radius:8px;margin-bottom:8px;background:rgba(255,255,255,0.02);display:flex;justify-content:space-between;align-items:center}
+    .item small{color:var(--muted)}
+
+    /* responsive ปรับขนาดปุ่ม touch target ถ้าจอเล็ก */
+    @media (max-width:420px){
+      .floating{width:44px;height:44px}
+      .panel{margin:10vh 12px 48px;padding:14px}
+      h1{font-size:18px}
     }
-</style>
+  </style>
 </head>
 <body>
+  <div class="app" id="app">
+    <h1>LangLeap</h1>
+    <p class="lead">ฝึกคำศัพท์ — กดปุ่มมุมขวาเพื่อเพิ่มคำ และมุมซ้ายดูประวัติ</p>
 
-<h1>LangLeap</h1>
-<p>ระบบท่องศัพท์ของคุณออนไลน์แล้ว 🎉</p>
-
-<!-- ปุ่มลอย -->
-<button id="addBtn" class="floating-btn">Add</button>
-<button id="historyBtn" class="floating-btn">History</button>
-
-<!-- 🔹 หน้า Add Word -->
-<div id="addPage" class="overlay">
-    <div class="box">
-        <h2>Add Vocabulary</h2>
-        <input id="wordInput" placeholder="Vocabulary">
-        <input id="meanInput" placeholder="Meaning">
-        <button onclick="saveWord()">Save</button>
+    <!-- ตัวอย่างเนื้อหาในหน้าแรก -->
+    <div style="width:100%;max-width:760px;margin-top:22px">
+      <div style="background:rgba(255,255,255,0.02);padding:16px;border-radius:12px">
+        <p style="margin:0;color:var(--muted)">กด Add เพื่อเพิ่มคำศัพท์ใหม่ แล้วกดเริ่มทดสอบได้</p>
+      </div>
     </div>
-    <button id="closeAdd" class="floating-btn" style="right:20px; bottom:20px; background:red;">Close</button>
-</div>
+  </div>
 
-<!-- 🔹 หน้า History -->
-<div id="historyPage" class="overlay">
-    <div class="box">
-        <h2>History</h2>
-        <div id="historyList"></div>
+  <!-- ปุ่มวงกลม: Add (มุมบนขว) -->
+  <button id="btnAdd" class="floating" aria-label="Open add">
+    <span class="ico" id="addLabel">＋</span>
+  </button>
+
+  <!-- ปุ่มวงกลม: History (มุมบนซ้าย) -->
+  <button id="btnHistory" class="floating" aria-label="Open history">
+    <span class="ico" id="histLabel">≡</span>
+  </button>
+
+  <!-- Overlay: Add Page -->
+  <div id="overlayAdd" class="overlay" aria-hidden="true">
+    <div class="panel" role="dialog" aria-modal="true" aria-labelledby="addTitle">
+      <h2 id="addTitle">เพิ่มคำศัพท์ใหม่</h2>
+      <input type="text" id="inpWord" placeholder="คำอังกฤษ (ตัวอย่าง: apple)">
+      <input type="text" id="inpMean" placeholder="คำแปล (ตัวอย่าง: แอปเปิล)">
+      <div style="display:flex;gap:8px;justify-content:center;margin-top:8px">
+        <button class="btn primary" id="saveBtn">บันทึก</button>
+        <button class="btn ghost" id="clearBtn">ล้าง</button>
+      </div>
+      <p style="color:var(--muted);font-size:13px;margin-top:12px">ข้อมูลจะเก็บในเครื่อง (LocalStorage) ใช้ส่วนตัวได้เลย</p>
     </div>
-    <button id="closeHistory" class="floating-btn" style="left:20px; bottom:20px; background:red;">Close</button>
-</div>
+  </div>
 
-<script>
-    let addPage = document.getElementById("addPage");
-    let historyPage = document.getElementById("historyPage");
-    let addBtn = document.getElementById("addBtn");
-    let historyBtn = document.getElementById("historyBtn");
+  <!-- Overlay: History Page -->
+  <div id="overlayHist" class="overlay" aria-hidden="true">
+    <div class="panel" role="dialog" aria-modal="true" aria-labelledby="histTitle">
+      <h2 id="histTitle">ประวัติคำศัพท์</h2>
+      <div class="list" id="histList" aria-live="polite"></div>
+      <div style="display:flex;gap:8px;justify-content:center;margin-top:12px">
+        <button class="btn ghost" id="clearAllBtn">ลบทั้งหมด</button>
+      </div>
+    </div>
+  </div>
 
-    // เปิด-ปิดหน้า Add
-    addBtn.onclick = ()=>{ addPage.style.display="block"; addBtn.style.display="none"; }
-    document.getElementById("closeAdd").onclick = ()=>{ addPage.style.display="none"; addBtn.style.display="block"; }
+  <script>
+    /***** หลักการสลับปุ่ม (ไม่ซ่อน) *****
+     - เมื่อกด Add: overlayAdd เปิด + btnAdd เปลี่ยนเป็น Close (icon "×") และ aria-label เปลี่ยน
+     - เมื่อกด Close: overlayAdd ปิด + btnAdd กลับเป็น Add (icon "＋")
+     - ทำแบบเดียวกันกับ History
+    *****/
 
-    // เปิด-ปิดหน้า History
-    historyBtn.onclick = ()=>{ historyPage.style.display="block"; historyBtn.style.display="none"; loadHistory(); }
-    document.getElementById("closeHistory").onclick = ()=>{ historyPage.style.display="none"; historyBtn.style.display="block"; }
+    // DOM
+    const btnAdd = document.getElementById('btnAdd');
+    const btnHistory = document.getElementById('btnHistory');
+    const overlayAdd = document.getElementById('overlayAdd');
+    const overlayHist = document.getElementById('overlayHist');
+    const addLabel = document.getElementById('addLabel');
+    const histLabel = document.getElementById('histLabel');
 
-    function saveWord(){
-        let word = wordInput.value.trim();
-        let mean = meanInput.value.trim();
-        if(word && mean){
-            let data = JSON.parse(localStorage.getItem("vocab")||"[]");
-            data.push({word,mean});
-            localStorage.setItem("vocab",JSON.stringify(data));
-            wordInput.value="";
-            meanInput.value="";
-            alert("✓ Saved!");
-        }
+    // inputs and storage helpers
+    const inpWord = document.getElementById('inpWord');
+    const inpMean = document.getElementById('inpMean');
+    const saveBtn = document.getElementById('saveBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const histList = document.getElementById('histList');
+    const clearAllBtn = document.getElementById('clearAllBtn');
+
+    // load current data
+    function loadData(){ return JSON.parse(localStorage.getItem('vocab')||'[]'); }
+    function saveData(arr){ localStorage.setItem('vocab', JSON.stringify(arr)); }
+
+    // toggle functions
+    function openAdd(){
+      overlayAdd.style.display = 'block';
+      overlayAdd.setAttribute('aria-hidden','false');
+      // เปลี่ยนปุ่มเป็น close (อยู่มุมเดิม)
+      addLabel.textContent = '✕';
+      btnAdd.setAttribute('aria-label','Close add');
+      // ถ้า history เปิด ให้ปิดอัตโนมัติ และปรับ history ปุ่มกลับ
+      if(overlayHist.style.display === 'block') closeHist();
+    }
+    function closeAdd(){
+      overlayAdd.style.display = 'none';
+      overlayAdd.setAttribute('aria-hidden','true');
+      addLabel.textContent = '＋';
+      btnAdd.setAttribute('aria-label','Open add');
+    }
+    function openHist(){
+      overlayHist.style.display = 'block';
+      overlayHist.setAttribute('aria-hidden','false');
+      histLabel.textContent = '✕';
+      btnHistory.setAttribute('aria-label','Close history');
+      // load history list every time
+      renderHistory();
+      if(overlayAdd.style.display === 'block') closeAdd();
+    }
+    function closeHist(){
+      overlayHist.style.display = 'none';
+      overlayHist.setAttribute('aria-hidden','true');
+      histLabel.textContent = '≡';
+      btnHistory.setAttribute('aria-label','Open history');
     }
 
-    function loadHistory(){
-        let data = JSON.parse(localStorage.getItem("vocab")||"[]");
-        historyList.innerHTML = data.map(v=> `<p><b>${v.word}</b> - ${v.mean}</p>`).join("");
+    // click handlers
+    btnAdd.addEventListener('click', ()=> {
+      if(overlayAdd.style.display === 'block') closeAdd(); else openAdd();
+    });
+    btnHistory.addEventListener('click', ()=> {
+      if(overlayHist.style.display === 'block') closeHist(); else openHist();
+    });
+
+    // save word
+    saveBtn.addEventListener('click', ()=>{
+      const w = inpWord.value.trim();
+      const m = inpMean.value.trim();
+      if(!w || !m){
+        alert('กรุณากรอกทั้งคำและความหมาย');
+        return;
+      }
+      const data = loadData();
+      data.push({word:w, mean:m, created: Date.now()});
+      saveData(data);
+      inpWord.value = '';
+      inpMean.value = '';
+      alert('เพิ่มเรียบร้อย ✓');
+      // ถ้าต้องการให้ปิดอัตโนมัติ: closeAdd();
+      renderHistory();
+    });
+
+    clearBtn.addEventListener('click', ()=>{
+      inpWord.value=''; inpMean.value='';
+    });
+
+    // render history
+    function renderHistory(){
+      const data = loadData();
+      if(data.length===0){
+        histList.innerHTML = '<div style="color:var(--muted);padding:10px;text-align:center">ยังไม่มีคำศัพท์</div>';
+        return;
+      }
+      // newest first
+      const rows = data.slice().reverse().map((it, idx)=>{
+        const t = new Date(it.created);
+        return `<div class="item">
+          <div>
+            <div style="font-weight:700">${escapeHtml(it.word)}</div>
+            <small>${escapeHtml(it.mean)} • ${t.toLocaleString()}</small>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <button class="btn ghost" data-index="${data.length-1-idx}" onclick="deleteOne(event)">ลบ</button>
+          </div>
+        </div>`;
+      }).join('');
+      histList.innerHTML = rows;
     }
-</script>
+
+    // delete single
+    function deleteOne(e){
+      const i = Number(e.currentTarget.getAttribute('data-index'));
+      const arr = loadData();
+      if(isNaN(i) || i<0 || i>=arr.length) return;
+      if(!confirm('ต้องการลบคำนี้จริงหรือไม่?')) return;
+      arr.splice(i,1);
+      saveData(arr);
+      renderHistory();
+    }
+    // make deleteOne global for inline onclick
+    window.deleteOne = deleteOne;
+
+    // clear all
+    clearAllBtn.addEventListener('click', ()=>{
+      if(!confirm('ลบคำศัพท์ทั้งหมด?')) return;
+      saveData([]);
+      renderHistory();
+    });
+
+    // escape html helper (simple)
+    function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+    // initial render
+    renderHistory();
+
+    // Keyboard: ถ้ากด Escape ปิด overlay ใด ๆ
+    document.addEventListener('keydown', (ev)=>{
+      if(ev.key === 'Escape'){
+        if(overlayAdd.style.display==='block') closeAdd();
+        if(overlayHist.style.display==='block') closeHist();
+      }
+    });
+
+    // ป้องกันการ scroll หน้าหลักเมื่อ overlay เปิด (option)
+    const body = document.body;
+    const observer = new MutationObserver(()=> {
+      if(overlayAdd.style.display==='block' || overlayHist.style.display==='block'){
+        body.style.overflow = 'hidden';
+      } else {
+        body.style.overflow = '';
+      }
+    });
+    observer.observe(overlayAdd, {attributes:true, attributeFilter:['style']});
+    observer.observe(overlayHist, {attributes:true, attributeFilter:['style']});
+
+  </script>
 </body>
 </html>
