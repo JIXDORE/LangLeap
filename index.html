@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vocabulary Quiz</title>
+
+<style>
+body{font-family:sans-serif;margin:0;padding:0;background:#f5f5f5;}
+header{display:flex;justify-content:space-between;padding:10px;background:#222;color:#fff;}
+button{padding:10px;margin-top:10px;border:none;border-radius:6px;font-size:16px;width:100%;}
+input,textarea{width:100%;padding:10px;font-size:18px;margin:10px 0;border-radius:6px;border:1px solid #aaa;}
+
+#main,#addWordsPage,#recordPage{display:none;padding:15px;}
+.correct{border:2px solid #45d45a;background:#d4ffd8;}
+.wrong{border:2px solid #ff6161;background:#ffd7d7;}
+
+.word-box{text-align:center;margin-top:40px;font-size:28px;}
+.answer-box input{font-size:22px;}
+
+.record-container{display:flex;gap:10px;}
+.col{flex:1;background:#fff;padding:10px;border-radius:8px;}
+.word-item{padding:6px;border-bottom:1px solid #ddd;}
+.delete-btn{background:red;color:#fff;border-radius:4px;padding:3px 6px;margin-left:6px;}
+
+@media(max-width:600px){
+.word-box{font-size:22px;}
+button{font-size:14px;}
+}
+</style>
+</head>
+<body>
+
+<header>
+    <button onclick="showRecordPage()">Record</button>
+    <button onclick="toggleAddPage()">Add</button>
+</header>
+
+<!---------------- หน้าเพิ่มคำศัพท์ ---------------->
+<section id="addWordsPage">
+    <h2>เพิ่มคำศัพท์ใหม่</h2>
+    <input id="newWord" placeholder="English Word">
+    <input id="newMeaning" placeholder="คำแปล">
+    <button onclick="addWord()" style="background:#007bff;color:#fff;">เพิ่ม</button>
+</section>
+
+<!---------------- หน้าเล่นท่องศัพท์ ---------------->
+<section id="main">
+    <div class="word-box" id="displayWord"></div>
+    <div class="answer-box">
+        <input id="answer" placeholder="พิมพ์คำแปลที่นี่">
+    </div>
+    <button onclick="checkAnswer()" style="background:#1abc9c;color:#fff;">ส่งคำตอบ</button>
+    <button id="nextBtn" onclick="nextWord()" style="display:none;background:#444;color:#fff;">NEXT</button>
+</section>
+
+<!---------------- หน้าบันทึกสถิติ ---------------->
+<section id="recordPage">
+    <h2>สรุปผล</h2>
+    <div class="record-container">
+        <div class="col">
+            <h3>ตอบถูก</h3>
+            <div id="correctList"></div>
+        </div>
+        <div class="col">
+            <h3>ตอบผิด</h3>
+            <div id="wrongList"></div>
+        </div>
+    </div>
+</section>
+
+<script>
+let words = JSON.parse(localStorage.getItem("words")) || [];
+let correct = JSON.parse(localStorage.getItem("correct")) || [];
+let wrong = JSON.parse(localStorage.getItem("wrong")) || [];
+let index = 0;
+
+function saveData(){
+    localStorage.setItem("words",JSON.stringify(words));
+    localStorage.setItem("correct",JSON.stringify(correct));
+    localStorage.setItem("wrong",JSON.stringify(wrong));
+}
+
+function toggleAddPage(){
+    document.getElementById("addWordsPage").style.display =
+        (document.getElementById("addWordsPage").style.display=="block")?"none":"block";
+    document.getElementById("main").style.display="block";
+}
+
+function addWord(){
+    let w=document.getElementById("newWord").value.trim();
+    let m=document.getElementById("newMeaning").value.trim();
+    if(w && m){
+        words.push({word:w,meaning:m});
+        saveData();
+        document.getElementById("newWord").value="";
+        document.getElementById("newMeaning").value="";
+        alert("เพิ่มเรียบร้อย");
+        loadWord();
+    }
+}
+
+function loadWord(){
+    if(words.length==0){document.getElementById("displayWord").innerText="ยังไม่มีคำศัพท์";return;}
+    document.getElementById("displayWord").innerText=words[index].word;
+    document.getElementById("answer").className="";
+    document.getElementById("answer").value="";
+    document.getElementById("nextBtn").style.display="none";
+}
+
+function checkAnswer(){
+    let ans=document.getElementById("answer").value.trim();
+    let correctAns=words[index].meaning;
+
+    if(ans===correctAns){
+        document.getElementById("answer").className="correct";
+        correct.push(words[index].word+" = "+correctAns);
+    }else{
+        document.getElementById("answer").className="wrong";
+        wrong.push(words[index].word+" = "+correctAns);
+        alert("คำตอบที่ถูกคือ: "+correctAns);
+    }
+    saveData();
+    document.getElementById("nextBtn").style.display="block";
+}
+
+function nextWord(){
+    index=(index+1)%words.length;
+    loadWord();
+}
+
+function showRecordPage(){
+    document.getElementById("main").style.display="none";
+    document.getElementById("addWordsPage").style.display="none";
+    document.getElementById("recordPage").style.display="block";
+
+    let c="",w="";
+    correct.forEach((x,i)=> c+=`<div class="word-item">${x} <span onclick="delCorrect(${i})" class="delete-btn">ลบ</span></div>`);
+    wrong.forEach(x=> w+=`<div class="word-item">${x}</div>`);
+
+    document.getElementById("correctList").innerHTML=c;
+    document.getElementById("wrongList").innerHTML=w;
+}
+
+function delCorrect(i){
+    correct.splice(i,1);
+    saveData();
+    showRecordPage();
+}
+
+window.onload=()=>{document.getElementById("main").style.display="block";loadWord();}
+</script>
+
+</body>
+</html>
