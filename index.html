@@ -1,155 +1,132 @@
 <!DOCTYPE html>
-<html lang="th">
+<html>
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Vocabulary Quiz</title>
+<title>LangLeap</title>
 
 <style>
-body{font-family:sans-serif;margin:0;padding:0;background:#f5f5f5;}
-header{display:flex;justify-content:space-between;padding:10px;background:#222;color:#fff;}
-button{padding:10px;margin-top:10px;border:none;border-radius:6px;font-size:16px;width:100%;}
-input,textarea{width:100%;padding:10px;font-size:18px;margin:10px 0;border-radius:6px;border:1px solid #aaa;}
+    body {
+        font-family: sans-serif;
+        background: #111;
+        color: #fff;
+        margin: 0;
+        text-align: center;
+    }
 
-#main,#addWordsPage,#recordPage{display:none;padding:15px;}
-.correct{border:2px solid #45d45a;background:#d4ffd8;}
-.wrong{border:2px solid #ff6161;background:#ffd7d7;}
+    h1 { margin-top: 40px; }
 
-.word-box{text-align:center;margin-top:40px;font-size:28px;}
-.answer-box input{font-size:22px;}
+    /* ปุ่ม Add และ History แบบวงกลม */
+    .floating-btn {
+        width: 55px;
+        height: 55px;
+        border-radius: 50%;
+        border: none;
+        cursor: pointer;
+        font-size: 14px;
+        background: #00c8ff;
+        color: black;
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        transition: 0.3s;
+    }
+    .floating-btn:hover { transform: scale(1.1); }
 
-.record-container{display:flex;gap:10px;}
-.col{flex:1;background:#fff;padding:10px;border-radius:8px;}
-.word-item{padding:6px;border-bottom:1px solid #ddd;}
-.delete-btn{background:red;color:#fff;border-radius:4px;padding:3px 6px;margin-left:6px;}
+    /* ปุ่ม History จะอยู่มุมซ้าย */
+    #historyBtn {
+        right: auto;
+        left: 20px;
+        background:#ffa600;
+    }
 
-@media(max-width:600px){
-.word-box{font-size:22px;}
-button{font-size:14px;}
-}
+    /* กล่องหน้า Add และ History (ซ้อนทับหน้าเว็บ) */
+    .overlay {
+        display:none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,.9);
+        backdrop-filter: blur(3px);
+        padding-top: 100px;
+    }
+    .box {
+        background:#222;
+        width: 90%;
+        max-width: 450px;
+        margin:auto;
+        padding:20px;
+        border-radius:15px;
+    }
+
+    input, button {
+        padding:10px;
+        width:80%;
+        margin:5px;
+        border-radius:5px;
+        border:none;
+        font-size:16px;
+    }
 </style>
 </head>
 <body>
 
-<header>
-    <button onclick="showRecordPage()">Record</button>
-    <button onclick="toggleAddPage()">Add</button>
-</header>
+<h1>LangLeap</h1>
+<p>ระบบท่องศัพท์ของคุณออนไลน์แล้ว 🎉</p>
 
-<!---------------- หน้าเพิ่มคำศัพท์ ---------------->
-<section id="addWordsPage">
-    <h2>เพิ่มคำศัพท์ใหม่</h2>
-    <input id="newWord" placeholder="English Word">
-    <input id="newMeaning" placeholder="คำแปล">
-    <button onclick="addWord()" style="background:#007bff;color:#fff;">เพิ่ม</button>
-</section>
+<!-- ปุ่มลอย -->
+<button id="addBtn" class="floating-btn">Add</button>
+<button id="historyBtn" class="floating-btn">History</button>
 
-<!---------------- หน้าเล่นท่องศัพท์ ---------------->
-<section id="main">
-    <div class="word-box" id="displayWord"></div>
-    <div class="answer-box">
-        <input id="answer" placeholder="พิมพ์คำแปลที่นี่">
+<!-- 🔹 หน้า Add Word -->
+<div id="addPage" class="overlay">
+    <div class="box">
+        <h2>Add Vocabulary</h2>
+        <input id="wordInput" placeholder="Vocabulary">
+        <input id="meanInput" placeholder="Meaning">
+        <button onclick="saveWord()">Save</button>
     </div>
-    <button onclick="checkAnswer()" style="background:#1abc9c;color:#fff;">ส่งคำตอบ</button>
-    <button id="nextBtn" onclick="nextWord()" style="display:none;background:#444;color:#fff;">NEXT</button>
-</section>
+    <button id="closeAdd" class="floating-btn" style="right:20px; bottom:20px; background:red;">Close</button>
+</div>
 
-<!---------------- หน้าบันทึกสถิติ ---------------->
-<section id="recordPage">
-    <h2>สรุปผล</h2>
-    <div class="record-container">
-        <div class="col">
-            <h3>ตอบถูก</h3>
-            <div id="correctList"></div>
-        </div>
-        <div class="col">
-            <h3>ตอบผิด</h3>
-            <div id="wrongList"></div>
-        </div>
+<!-- 🔹 หน้า History -->
+<div id="historyPage" class="overlay">
+    <div class="box">
+        <h2>History</h2>
+        <div id="historyList"></div>
     </div>
-</section>
+    <button id="closeHistory" class="floating-btn" style="left:20px; bottom:20px; background:red;">Close</button>
+</div>
 
 <script>
-let words = JSON.parse(localStorage.getItem("words")) || [];
-let correct = JSON.parse(localStorage.getItem("correct")) || [];
-let wrong = JSON.parse(localStorage.getItem("wrong")) || [];
-let index = 0;
+    let addPage = document.getElementById("addPage");
+    let historyPage = document.getElementById("historyPage");
+    let addBtn = document.getElementById("addBtn");
+    let historyBtn = document.getElementById("historyBtn");
 
-function saveData(){
-    localStorage.setItem("words",JSON.stringify(words));
-    localStorage.setItem("correct",JSON.stringify(correct));
-    localStorage.setItem("wrong",JSON.stringify(wrong));
-}
+    // เปิด-ปิดหน้า Add
+    addBtn.onclick = ()=>{ addPage.style.display="block"; addBtn.style.display="none"; }
+    document.getElementById("closeAdd").onclick = ()=>{ addPage.style.display="none"; addBtn.style.display="block"; }
 
-function toggleAddPage(){
-    document.getElementById("addWordsPage").style.display =
-        (document.getElementById("addWordsPage").style.display=="block")?"none":"block";
-    document.getElementById("main").style.display="block";
-}
+    // เปิด-ปิดหน้า History
+    historyBtn.onclick = ()=>{ historyPage.style.display="block"; historyBtn.style.display="none"; loadHistory(); }
+    document.getElementById("closeHistory").onclick = ()=>{ historyPage.style.display="none"; historyBtn.style.display="block"; }
 
-function addWord(){
-    let w=document.getElementById("newWord").value.trim();
-    let m=document.getElementById("newMeaning").value.trim();
-    if(w && m){
-        words.push({word:w,meaning:m});
-        saveData();
-        document.getElementById("newWord").value="";
-        document.getElementById("newMeaning").value="";
-        alert("เพิ่มเรียบร้อย");
-        loadWord();
+    function saveWord(){
+        let word = wordInput.value.trim();
+        let mean = meanInput.value.trim();
+        if(word && mean){
+            let data = JSON.parse(localStorage.getItem("vocab")||"[]");
+            data.push({word,mean});
+            localStorage.setItem("vocab",JSON.stringify(data));
+            wordInput.value="";
+            meanInput.value="";
+            alert("✓ Saved!");
+        }
     }
-}
 
-function loadWord(){
-    if(words.length==0){document.getElementById("displayWord").innerText="ยังไม่มีคำศัพท์";return;}
-    document.getElementById("displayWord").innerText=words[index].word;
-    document.getElementById("answer").className="";
-    document.getElementById("answer").value="";
-    document.getElementById("nextBtn").style.display="none";
-}
-
-function checkAnswer(){
-    let ans=document.getElementById("answer").value.trim();
-    let correctAns=words[index].meaning;
-
-    if(ans===correctAns){
-        document.getElementById("answer").className="correct";
-        correct.push(words[index].word+" = "+correctAns);
-    }else{
-        document.getElementById("answer").className="wrong";
-        wrong.push(words[index].word+" = "+correctAns);
-        alert("คำตอบที่ถูกคือ: "+correctAns);
+    function loadHistory(){
+        let data = JSON.parse(localStorage.getItem("vocab")||"[]");
+        historyList.innerHTML = data.map(v=> `<p><b>${v.word}</b> - ${v.mean}</p>`).join("");
     }
-    saveData();
-    document.getElementById("nextBtn").style.display="block";
-}
-
-function nextWord(){
-    index=(index+1)%words.length;
-    loadWord();
-}
-
-function showRecordPage(){
-    document.getElementById("main").style.display="none";
-    document.getElementById("addWordsPage").style.display="none";
-    document.getElementById("recordPage").style.display="block";
-
-    let c="",w="";
-    correct.forEach((x,i)=> c+=`<div class="word-item">${x} <span onclick="delCorrect(${i})" class="delete-btn">ลบ</span></div>`);
-    wrong.forEach(x=> w+=`<div class="word-item">${x}</div>`);
-
-    document.getElementById("correctList").innerHTML=c;
-    document.getElementById("wrongList").innerHTML=w;
-}
-
-function delCorrect(i){
-    correct.splice(i,1);
-    saveData();
-    showRecordPage();
-}
-
-window.onload=()=>{document.getElementById("main").style.display="block";loadWord();}
 </script>
-
 </body>
 </html>
