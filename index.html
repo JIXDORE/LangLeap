@@ -1,147 +1,190 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="th">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>LangLeap</title>
-  <style>
-    :root{
-      --bg:#0b0f14;
-      --card:#0f1720;
-      --accent:#00c8ff;
-      --accent2:#ffa600;
-      --muted:#a9b3bd;
-      --danger:#ff5252;
-      --radius:12px;
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vocabulary Trainer</title>
+
+<style>
+    body{
+        font-family: sans-serif; margin:0; background:#111; color:#fff;
     }
-
-    *{box-sizing:border-box}
-    html,body{height:100%;margin:0;font-family:system-ui;background:var(--bg);color:#fff}
-    .app{min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:18px 12px 100px}
-
-    h1{margin:28px 0 6px;font-size:20px}
-    p.lead{margin:0;color:var(--muted);font-size:14px}
-
-    /* ปุ่มหลักมุมจอ */
-    .floating {
-      position:fixed;
-      top:12px;
-      width:48px;height:48px;
-      border-radius:50%;
-      border:0;
-      display:flex;align-items:center;justify-content:center;
-      font-weight:600;cursor:pointer;
-      box-shadow:0 6px 18px rgba(0,0,0,.6);
-      z-index:9999;  /* << สำคัญ */
+    .top-right, .top-left{
+        position:fixed; top:10px; padding:10px 14px; border-radius:8px;
+        background:#333; color:#fff; cursor:pointer; font-size:14px;
     }
-    #btnAdd{ right:12px;background:var(--accent);color:#000; }
-    #btnHistory{ left:12px;background:var(--accent2);color:#000; }
+    .top-right{ right:10px; }
+    .top-left{ left:10px; display:none; }
 
-    .floating .ico{font-size:14px;line-height:1;}
-
-    /* หน้า Overlay */
-    .overlay{
-      position:fixed; inset:0;
-      display:none;
-      background:rgba(0,0,0,.78);
-      z-index:9000;
-      padding:20px;overflow:auto;
+    .container{ padding:20px; max-width:450px; margin:auto; text-align:center; }
+    input,button{
+        width:100%; padding:12px; margin:8px 0; font-size:16px;
     }
-    .panel{
-      max-width:720px;
-      margin:14vh auto;
-      background:var(--card);
-      border-radius:var(--radius);
-      padding:18px;
+    input{
+        border:2px solid #444; border-radius:6px; background:#222; color:#fff;
     }
-
-    /* << เพิ่มปุ่ม Close ใหม่ */
-    .closeOverlay{
-      position:fixed;
-      top:12px;
-      width:48px;height:48px;
-      border-radius:50%;
-      display:flex;align-items:center;justify-content:center;
-      font-size:20px;
-      background:#ff4d4d;
-      color:#fff;border:0;
-      cursor:pointer;
-      z-index:10000; /* อยู่บนสุด */
+    button{
+        background:#03a9f4; border:none; color:#fff; border-radius:6px;
     }
+    #nextBtn{ margin-top:8px; background:#4caf50; display:none; }
 
-    /* ปุ่ม close ของ Add = อยู่ด้านขวา */
-    #closeAdd{ right:12px; }
+    .correct{ border-color:#00e676 !important; }
+    .wrong{ border-color:#ff1744 !important; }
 
-    /* ปุ่ม close ของ History = อยู่ด้านซ้าย */
-    #closeHist{ left:12px; }
-
-  </style>
+    /* หน้า logs */
+    #logPage{ display:none; padding:20px; }
+    .rowBox{
+        display:flex; gap:10px; justify-content:space-between;
+    }
+    .listBox{
+        width:50%; background:#222; padding:10px; border-radius:8px; min-height:250px; overflow-y:auto;
+    }
+    .wordItem{ background:#333; padding:6px; border-radius:6px; margin-bottom:6px; }
+    .wordItem button{
+        background:red; margin-top:4px; font-size:13px;
+    }
+</style>
 </head>
+
 <body>
 
-<div class="app">
-  <h1>LangLeap</h1>
-  <p class="lead">เพิ่มคำ → มุมขวา | ดูประวัติ → มุมซ้าย</p>
+<!-- ปุ่มเปิดเพิ่มคำศัพท์ -->
+<div class="top-right" id="openAdd">เพิ่มคำศัพท์</div>
+<!-- ปุ่มเข้าหน้าบันทึก -->
+<div class="top-left" id="openLog">บันทึก</div>
+
+<!-- หน้าเพิ่มคำศัพท์ -->
+<div class="container" id="addPage" style="display:none;">
+    <h2>เพิ่มคำศัพท์</h2>
+    <input id="engInput" placeholder="English Word">
+    <input id="thaiInput" placeholder="แปลไทย">
+    <button onclick="addWord()">เพิ่มคำศัพท์</button>
 </div>
 
-<button id="btnAdd" class="floating"><span id="addLabel">＋</span></button>
-<button id="btnHistory" class="floating"><span id="histLabel">≡</span></button>
-
-<!-- ADD PAGE -->
-<div id="overlayAdd" class="overlay">
-  <button id="closeAdd" class="closeOverlay">✕</button>
-  <div class="panel">
-    <h2>เพิ่มคำศัพท์ใหม่</h2>
-    <input type="text" id="inpWord" placeholder="คำอังกฤษ">
-    <input type="text" id="inpMean" placeholder="คำแปล">
-    <button id="saveBtn" style="width:100%;margin-top:10px;background:var(--accent);padding:12px;border-radius:8px;border:0;font-weight:700">
-      บันทึก
-    </button>
-  </div>
+<!-- หน้าเล่น -->
+<div class="container" id="mainPage" style="display:none;">
+    <h2 id="showWord"></h2>
+    <input id="answerInput" placeholder="พิมพ์คำแปลที่นี่">
+    <button onclick="checkAnswer()">ส่งคำตอบ</button>
+    <button id="nextBtn" onclick="nextWord()">NEXT</button>
 </div>
 
-<!-- HISTORY PAGE -->
-<div id="overlayHist" class="overlay">
-  <button id="closeHist" class="closeOverlay">✕</button>
-  <div class="panel">
-    <h2>ประวัติคำศัพท์</h2>
-    <div id="histList"></div>
-    <button id="clearAllBtn" style="width:100%;margin-top:14px" class="btn ghost">ลบทั้งหมด</button>
-  </div>
+<!-- หน้า Log -->
+<div id="logPage">
+    <h2>ผลการทำแบบฝึกหัด</h2>
+    <div class="rowBox">
+        <div class="listBox">
+            <h3>ตอบถูก</h3>
+            <div id="correctList"></div>
+        </div>
+        <div class="listBox">
+            <h3>ตอบผิด</h3>
+            <div id="wrongList"></div>
+        </div>
+    </div>
 </div>
 
 <script>
-/* เปิด/ปิด ADD */
-btnAdd.onclick=()=> overlayAdd.style.display="block";
-closeAdd.onclick=()=> overlayAdd.style.display="none";
+let words = JSON.parse(localStorage.getItem("words")||"[]");
+let correct = JSON.parse(localStorage.getItem("correct")||"[]");
+let wrong = JSON.parse(localStorage.getItem("wrong")||"[]");
 
-/* เปิด/ปิด HISTORY */
-btnHistory.onclick=()=>{ overlayHist.style.display="block"; renderHistory(); }
-closeHist.onclick=()=> overlayHist.style.display="none";
+let now = 0;
 
-/* เก็บข้อมูล */
-function load(){return JSON.parse(localStorage.getItem("vocab")||"[]")}
-function save(v){localStorage.setItem("vocab",JSON.stringify(v))}
+// เปลี่ยนหน้า
+function showAddPage(){ hideAll(); addPage.style.display="block"; }
+function showMainPage(){ hideAll(); mainPage.style.display="block"; loadWord(); openLog.style.display="block";}
+function showLog(){ hideAll(); logPage.style.display="block"; openLog.style.display="block"; loadLog();}
 
-/* บันทึกคำ */
-saveBtn.onclick=()=>{
-  let w=inpWord.value.trim(), m=inpMean.value.trim();
-  if(!w||!m) return alert("กรอกให้ครบ");
-  let d=load(); d.push({word:w,mean:m,time:Date.now()}); save(d);
-  inpWord.value=""; inpMean.value="";
-  alert("บันทึกแล้ว ✓");
-  renderHistory();
-};
-
-/* history */
-function renderHistory(){
-  let d=load();
-  histList.innerHTML = d.length===0 ? "<p style='color:#aaa;text-align:center;'>ยังไม่มีข้อมูล</p>"
-  : d.map(o=>`<div style="padding:10px;background:#111;border-radius:8px;margin-top:6px">
-      <b>${o.word}</b><br><span style="opacity:.6">${o.mean}</span>
-    </div>`).join("");
+function hideAll(){
+    addPage.style.display="none";
+    mainPage.style.display="none";
+    logPage.style.display="none";
 }
-clearAllBtn.onclick=()=>{ if(confirm("ลบทั้งหมด?")) save([]),renderHistory() };
+
+// เปิดหน้าเริ่ม
+if(words.length==0) showAddPage();
+else showMainPage();
+
+// ปุ่มมุมขวาบน
+openAdd.onclick=()=>showAddPage();
+openLog.onclick=()=>showLog();
+
+// เพิ่มคำศัพท์
+function addWord(){
+    let e=engInput.value.trim(), t=thaiInput.value.trim();
+    if(!e||!t) return alert("ใส่คำให้ครบ");
+    words.push({eng:e,thai:t});
+    localStorage.setItem("words",JSON.stringify(words));
+    engInput.value=""; thaiInput.value="";
+    alert("เพิ่มแล้ว");
+    showMainPage();
+}
+
+// โหลดคำถาม
+function loadWord(){
+    if(words.length==0) return alert("ยังไม่มีคำศัพท์");
+    now = Math.floor(Math.random()*words.length);
+    showWord.innerHTML = words[now].eng;
+    answerInput.value="";
+    answerInput.className="";
+    nextBtn.style.display="none";
+}
+
+// ตรวจคำตอบ
+function checkAnswer(){
+    let ans = answerInput.value.trim();
+    if(ans=="") return;
+
+    if(ans == words[now].thai){
+        answerInput.className="correct";
+        moveWord(words[now],"correct");
+    }else{
+        answerInput.className="wrong";
+        alert("คำตอบที่ถูกคือ: " + words[now].thai);
+        moveWord(words[now],"wrong");
+    }
+    nextBtn.style.display="block";
+}
+
+// ย้ายข้อมูล ถูก/ผิด
+function moveWord(item,type){
+    let cIndex = correct.findIndex(x=>x.eng==item.eng);
+    let wIndex = wrong.findIndex(x=>x.eng==item.eng);
+    if(type=="correct"){
+        if(wIndex>-1) wrong.splice(wIndex,1);
+        if(cIndex==-1) correct.push(item);
+    }else{
+        if(cIndex>-1) correct.splice(cIndex,1);
+        if(wIndex==-1) wrong.push(item);
+    }
+    saveLog();
+}
+
+// ไปข้อต่อไป
+function nextWord(){ loadWord(); }
+
+// บันทึกลง LocalStorage
+function saveLog(){
+    localStorage.setItem("correct",JSON.stringify(correct));
+    localStorage.setItem("wrong",JSON.stringify(wrong));
+}
+
+// โหลด Log
+function loadLog(){
+    correctList.innerHTML="";
+    wrongList.innerHTML="";
+    correct.forEach(v=>{
+        correctList.innerHTML += `<div class='wordItem'>${v.eng} = ${v.thai}<br><button onclick="removeCorrect('${v.eng}')">ลบ</button></div>`;
+    });
+    wrong.forEach(v=>{
+        wrongList.innerHTML += `<div class='wordItem'>${v.eng} = ${v.thai}</div>`;
+    });
+}
+function removeCorrect(word){
+    correct=correct.filter(x=>x.eng!=word);
+    saveLog(); loadLog();
+}
 </script>
 
 </body>
