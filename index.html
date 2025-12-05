@@ -1,191 +1,321 @@
-<!DOCTYPE html>
-<html lang="th">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Vocabulary Trainer</title>
+import React, { useEffect, useState, useRef } from "react";
 
-<style>
-    body{
-        font-family: sans-serif; margin:0; background:#111; color:#fff;
+// Mobile Vocab Trainer
+// Single React component (default export) ready to drop into a React app.
+// Uses localStorage for persistence so the web app and data remain private on your device.
+
+const STORAGE_KEY = "vocab_trainer_v1";
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return { vocabs: [] };
+    return JSON.parse(raw);
+  } catch (e) {
+    console.error(e);
+    return { vocabs: [] };
+  }
+}
+
+function saveState(state) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+// weighted random selection that reduces chance of recently-correct words
+function pickWeighted(vocabs) {
+  if (!vocabs || vocabs.length === 0) return null;
+  // weight = 1 / (1 + correctCount)  -> more correct => smaller weight
+  // also if lastSeen recently, slightly reduce weight
+  const weights = vocabs.map((v) => {
+    const base = 1 / (1 + (v.correctCount || 0));
+    const penalty = v.recent ? 0.5 : 1; // penalize recently seen words
+    return base * penalty;
+  });
+  const total = weights.reduce((a, b) => a + b, 0);
+  if (total === 0) return vocabs[Math.floor(Math.random() * vocabs.length)];
+  let r = Math.random() * total;
+  for (let i = 0; i < vocabs.length; i++) {
+    r -= weights[i];
+    if (r <= 0) return vocabs[i];
+  }
+  return vocabs[vocabs.length - 1];
+}
+
+// Added full dark theme styling for UI, cards, buttons, inputs
+export default function MobileVocabTrainer() {
+  const [state, setState] = useState(() => loadState());
+  const [showAdd, setShowAdd] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [engInput, setEngInput] = useState("");
+  const [thaiInput, setThaiInput] = useState("");
+
+  // quiz state
+  const [current, setCurrent] = useState(null);
+  const [answer, setAnswer] = useState("");
+  const [feedback, setFeedback] = useState(null); // 'correct' | 'wrong' | null
+
+  const answerRef = useRef(null);
+
+  useEffect(() => {
+    saveState(state);
+  }, [state]);
+
+  // mark all as not recent every time we pick a new one
+  function pickNext() {
+    const available = state.vocabs || [];
+    if (available.length === 0) {
+      setCurrent(null);
+      setAnswer("");
+      setFeedback(null);
+      return;
     }
-    .top-right, .top-left{
-        position:fixed; top:10px; padding:10px 14px; border-radius:8px;
-        background:#333; color:#fff; cursor:pointer; font-size:14px;
+    // clear recent flags
+    const cleared = available.map((v) => ({ ...v, recent: false }));
+    const picked = pickWeighted(cleared);
+    // mark chosen as recent
+    const newVocabs = cleared.map((v) => (v.id === picked.id ? { ...v, recent: true } : v));
+    setState((s) => ({ ...s, vocabs: newVocabs }));
+    setCurrent(picked);
+    setAnswer("");
+    setFeedback(null);
+    // focus answer input on mobile
+    setTimeout(() => answerRef.current && answerRef.current.focus(), 150);
+  }
+
+  function addVocab() {
+    const eng = engInput.trim();
+    const th = thaiInput.trim();
+    if (!eng || !th) return;
+    const id = Date.now().toString();
+    const newV = { id, eng, th, correctCount: 0, wrongCount: 0, recent: false };
+    const newVocabs = [...(state.vocabs || []), newV];
+    setState((s) => ({ ...s, vocabs: newVocabs }));
+    setEngInput("");
+    setThaiInput("");
+  }
+
+  function submitAnswer() {
+    if (!current) return;
+    const user = answer.trim();
+    const correct = user.toLowerCase() === current.th.toLowerCase();
+    setFeedback(correct ? "correct" : "wrong");
+    // update counts and history placement
+    setState((s) => {
+      const vocabs = s.vocabs.map((v) => {
+        if (v.id !== current.id) return v;
+        const updated = { ...v };
+        if (correct) {
+          updated.correctCount = (updated.correctCount || 0) + 1;
+          updated.wrongCount = updated.wrongCount || 0;
+        } else {
+          updated.wrongCount = (updated.wrongCount || 0) + 1;
+        }
+        return updated;
+      });
+      return { ...s, vocabs };
+    });
+  }
+
+  function nextAfterAnswer() {
+    // move between lists handled by counts; just pick next
+    pickNext();
+  }
+
+  function enterHistory() {
+    setShowHistory(true);
+    setShowAdd(false);
+  }
+
+  function closeOverlays() {
+    setShowAdd(false);
+    setShowHistory(false);
+  }
+
+  function deleteCorrect(id) {
+    const vocabs = (state.vocabs || []).filter((v) => v.id !== id);
+    setState({ ...state, vocabs });
+    // if deleting current, null it
+    if (current && current.id === id) setCurrent(null);
+  }
+
+  // derived lists
+  const correctList = (state.vocabs || []).filter((v) => (v.correctCount || 0) > (v.wrongCount || 0));
+  const wrongList = (state.vocabs || []).filter((v) => (v.wrongCount || 0) >= (v.correctCount || 0) && (v.wrongCount || 0) > 0);
+
+  // initial pick when there are vocabs and no current
+  useEffect(() => {
+    if (!current && (state.vocabs || []).length > 0 && !showAdd && !showHistory) {
+      pickNext();
     }
-    .top-right{ right:10px; }
-    .top-left{ left:10px; display:none; }
-
-    .container{ padding:20px; max-width:450px; margin:auto; text-align:center; }
-    input,button{
-        width:100%; padding:12px; margin:8px 0; font-size:16px;
+    if ((state.vocabs || []).length === 0) {
+      setCurrent(null);
     }
-    input{
-        border:2px solid #444; border-radius:6px; background:#222; color:#fff;
-    }
-    button{
-        background:#03a9f4; border:none; color:#fff; border-radius:6px;
-    }
-    #nextBtn{ margin-top:8px; background:#4caf50; display:none; }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.vocabs, showAdd, showHistory]);
 
-    .correct{ border-color:#00e676 !important; }
-    .wrong{ border-color:#ff1744 !important; }
+  return (
+    <div className="min-h-screen bg-slate-50 flex flex-col items-center p-4 sm:p-6">
+      {/* Top bar */}
+      <div className="w-full max-w-md">
+        <div className="flex items-center justify-between py-2">
+          <button
+            onClick={enterHistory}
+            className="text-sm px-3 py-2 rounded-lg bg-white shadow-sm"
+            aria-label="open history"
+          >
+            ประวัติ
+          </button>
 
-    /* หน้า logs */
-    #logPage{ display:none; padding:20px; }
-    .rowBox{
-        display:flex; gap:10px; justify-content:space-between;
-    }
-    .listBox{
-        width:50%; background:#222; padding:10px; border-radius:8px; min-height:250px; overflow-y:auto;
-    }
-    .wordItem{ background:#333; padding:6px; border-radius:6px; margin-bottom:6px; }
-    .wordItem button{
-        background:red; margin-top:4px; font-size:13px;
-    }
-</style>
-</head>
+          <div className="text-center font-semibold">คำศัพท์มือถือ</div>
 
-<body>
-
-<!-- ปุ่มเปิดเพิ่มคำศัพท์ -->
-<div class="top-right" id="openAdd">เพิ่มคำศัพท์</div>
-<!-- ปุ่มเข้าหน้าบันทึก -->
-<div class="top-left" id="openLog">บันทึก</div>
-
-<!-- หน้าเพิ่มคำศัพท์ -->
-<div class="container" id="addPage" style="display:none;">
-    <h2>เพิ่มคำศัพท์</h2>
-    <input id="engInput" placeholder="English Word">
-    <input id="thaiInput" placeholder="แปลไทย">
-    <button onclick="addWord()">เพิ่มคำศัพท์</button>
-</div>
-
-<!-- หน้าเล่น -->
-<div class="container" id="mainPage" style="display:none;">
-    <h2 id="showWord"></h2>
-    <input id="answerInput" placeholder="พิมพ์คำแปลที่นี่">
-    <button onclick="checkAnswer()">ส่งคำตอบ</button>
-    <button id="nextBtn" onclick="nextWord()">NEXT</button>
-</div>
-
-<!-- หน้า Log -->
-<div id="logPage">
-    <h2>ผลการทำแบบฝึกหัด</h2>
-    <div class="rowBox">
-        <div class="listBox">
-            <h3>ตอบถูก</h3>
-            <div id="correctList"></div>
+          <div>
+            <button
+              onClick={() => setShowAdd((s) => !s)}
+              className="text-sm px-3 py-2 rounded-lg bg-white shadow-sm"
+              aria-label="add vocab"
+            >
+              {showAdd ? "ปิด" : "เพิ่มคำศัพท์"}
+            </button>
+          </div>
         </div>
-        <div class="listBox">
-            <h3>ตอบผิด</h3>
-            <div id="wrongList"></div>
+
+        {/* Main card area */}
+        <div className="mt-6 bg-white rounded-2xl shadow p-4 min-h-[60vh] flex flex-col justify-center items-center">
+          {/* empty initial screen */}
+          {(!state.vocabs || state.vocabs.length === 0) && !showAdd && !showHistory && (
+            <div className="text-center text-slate-400">
+              ไม่มีคำศัพท์ในระบบ
+              <div className="mt-4 text-sm">กด "เพิ่มคำศัพท์" เพื่อเริ่มต้น</div>
+            </div>
+          )}
+
+          {/* Show Add overlay content */}
+          {showAdd && (
+            <div className="w-full">
+              <label className="block text-sm mb-1">คำศัพท์ (English)</label>
+              <input
+                className="w-full p-3 rounded-lg border"
+                value={engInput}
+                onChange={(e) => setEngInput(e.target.value)}
+                placeholder="เช่น happy"
+              />
+              <label className="block text-sm mb-1 mt-3">คำแปล (ภาษาไทย)</label>
+              <input
+                className="w-full p-3 rounded-lg border"
+                value={thaiInput}
+                onChange={(e) => setThaiInput(e.target.value)}
+                placeholder="เช่น มีความสุข"
+              />
+              <div className="flex gap-2 mt-4">
+                <button
+                  onClick={addVocab}
+                  className="flex-1 py-3 rounded-lg bg-emerald-500 text-white font-medium"
+                >
+                  เพิ่ม
+                </button>
+                <button
+                  onClick={closeOverlays}
+                  className="flex-1 py-3 rounded-lg bg-slate-200"
+                >
+                  ปิด
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Quiz area */}
+          {!showAdd && !showHistory && current && (
+            <div className="w-full">
+              <div className="text-center text-2xl font-semibold p-4">{current.eng}</div>
+
+              <label className="block text-sm mb-1">พิมพ์คำแปล</label>
+              <input
+                ref={answerRef}
+                className={`w-full p-3 rounded-lg border ${
+                  feedback === "correct" ? "border-emerald-500" : feedback === "wrong" ? "border-rose-500" : "border-slate-200"
+                }`}
+                value={answer}
+                onChange={(e) => setAnswer(e.target.value)}
+                placeholder="พิมพ์คำแปลเป็นภาษาไทย"
+                disabled={feedback !== null}
+              />
+
+              {feedback === "wrong" && (
+                <div className="mt-2 text-sm text-rose-600">คำตอบที่ถูกต้อง: {current.th}</div>
+              )}
+
+              <div className="flex gap-2 mt-4">
+                <button
+                  onClick={submitAnswer}
+                  className="flex-1 py-3 rounded-lg bg-indigo-600 text-white"
+                  disabled={feedback !== null}
+                >
+                  ส่งคำตอบ
+                </button>
+                {feedback && (
+                  <button onClick={nextAfterAnswer} className="py-3 px-4 rounded-lg bg-slate-100">
+                    NEXT
+                  </button>
+                )}
+              </div>
+
+              <div className="mt-6 text-xs text-slate-400">คำศัพท์จะแสดงแบบสุ่ม — คำที่ตอบถูกบ่อยจะมีโอกาสน้อยลง</div>
+            </div>
+          )}
+
+          {/* If vocab exists but none picked (e.g., after deletion) */}
+          {!showAdd && !showHistory && state.vocabs && state.vocabs.length > 0 && !current && (
+            <div className="text-center text-slate-500">พร้อม — กำลังเลือกคำศัพท์...</div>
+          )}
         </div>
+
+        {/* History panel (full screen overlay inside card) */}
+        {showHistory && (
+          <div className="mt-4 bg-white rounded-2xl shadow p-4">
+            <div className="flex justify-between items-center mb-3">
+              <div className="font-medium">ประวัติการตอบ</div>
+              <button onClick={closeOverlays} className="text-sm p-2 bg-slate-100 rounded">ปิด</button>
+            </div>
+
+            <div className="flex gap-3">
+              <div className="flex-1">
+                <div className="text-sm font-medium mb-2">ตอบถูก ({correctList.length})</div>
+                <div className="space-y-2 max-h-[40vh] overflow-auto pr-2">
+                  {correctList.map((v) => (
+                    <div key={v.id} className="flex items-center justify-between border rounded p-2">
+                      <div>
+                        <div className="text-sm font-medium">{v.eng}</div>
+                        <div className="text-xs text-slate-500">{v.th}</div>
+                      </div>
+                      <div className="flex flex-col items-end gap-2">
+                        <button onClick={() => deleteCorrect(v.id)} className="text-xs text-rose-600">ลบ</button>
+                      </div>
+                    </div>
+                  ))}
+                  {correctList.length === 0 && <div className="text-xs text-slate-400">ยังไม่มีคำที่ตอบถูก</div>}
+                </div>
+              </div>
+
+              <div className="flex-1">
+                <div className="text-sm font-medium mb-2">ตอบผิด ({wrongList.length})</div>
+                <div className="space-y-2 max-h-[40vh] overflow-auto pr-2">
+                  {wrongList.map((v) => (
+                    <div key={v.id} className="border rounded p-2">
+                      <div className="text-sm font-medium">{v.eng}</div>
+                      <div className="text-xs text-slate-500">ถูกต้อง: {v.th}</div>
+                    </div>
+                  ))}
+                  {wrongList.length === 0 && <div className="text-xs text-slate-400">ยังไม่มีคำที่ตอบผิด</div>}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 text-xs text-slate-400">หมายเหตุ: แค่แสดง — ฝั่งผิดไม่สามารถแก้ไขได้โดยตรง แต่เมื่อคุณตอบคำศัพท์ใหม่และผลต่างออกไป ระบบจะย้ายคำนั้นอัตโนมัติ</div>
+          </div>
+        )}
+      </div>
+
+      <div className="text-center text-xs text-slate-400 mt-4">ข้อมูลเก็บไว้ในอุปกรณ์ของคุณเท่านั้น (localStorage) — แชร์ไฟล์นี้หรือส่งลิงก์ด้วยตัวคุณเองเท่านั้น</div>
     </div>
-</div>
-
-<script>
-let words = JSON.parse(localStorage.getItem("words")||"[]");
-let correct = JSON.parse(localStorage.getItem("correct")||"[]");
-let wrong = JSON.parse(localStorage.getItem("wrong")||"[]");
-
-let now = 0;
-
-// เปลี่ยนหน้า
-function showAddPage(){ hideAll(); addPage.style.display="block"; }
-function showMainPage(){ hideAll(); mainPage.style.display="block"; loadWord(); openLog.style.display="block";}
-function showLog(){ hideAll(); logPage.style.display="block"; openLog.style.display="block"; loadLog();}
-
-function hideAll(){
-    addPage.style.display="none";
-    mainPage.style.display="none";
-    logPage.style.display="none";
+  );
 }
-
-// เปิดหน้าเริ่ม
-if(words.length==0) showAddPage();
-else showMainPage();
-
-// ปุ่มมุมขวาบน
-openAdd.onclick=()=>showAddPage();
-openLog.onclick=()=>showLog();
-
-// เพิ่มคำศัพท์
-function addWord(){
-    let e=engInput.value.trim(), t=thaiInput.value.trim();
-    if(!e||!t) return alert("ใส่คำให้ครบ");
-    words.push({eng:e,thai:t});
-    localStorage.setItem("words",JSON.stringify(words));
-    engInput.value=""; thaiInput.value="";
-    alert("เพิ่มแล้ว");
-    showMainPage();
-}
-
-// โหลดคำถาม
-function loadWord(){
-    if(words.length==0) return alert("ยังไม่มีคำศัพท์");
-    now = Math.floor(Math.random()*words.length);
-    showWord.innerHTML = words[now].eng;
-    answerInput.value="";
-    answerInput.className="";
-    nextBtn.style.display="none";
-}
-
-// ตรวจคำตอบ
-function checkAnswer(){
-    let ans = answerInput.value.trim();
-    if(ans=="") return;
-
-    if(ans == words[now].thai){
-        answerInput.className="correct";
-        moveWord(words[now],"correct");
-    }else{
-        answerInput.className="wrong";
-        alert("คำตอบที่ถูกคือ: " + words[now].thai);
-        moveWord(words[now],"wrong");
-    }
-    nextBtn.style.display="block";
-}
-
-// ย้ายข้อมูล ถูก/ผิด
-function moveWord(item,type){
-    let cIndex = correct.findIndex(x=>x.eng==item.eng);
-    let wIndex = wrong.findIndex(x=>x.eng==item.eng);
-    if(type=="correct"){
-        if(wIndex>-1) wrong.splice(wIndex,1);
-        if(cIndex==-1) correct.push(item);
-    }else{
-        if(cIndex>-1) correct.splice(cIndex,1);
-        if(wIndex==-1) wrong.push(item);
-    }
-    saveLog();
-}
-
-// ไปข้อต่อไป
-function nextWord(){ loadWord(); }
-
-// บันทึกลง LocalStorage
-function saveLog(){
-    localStorage.setItem("correct",JSON.stringify(correct));
-    localStorage.setItem("wrong",JSON.stringify(wrong));
-}
-
-// โหลด Log
-function loadLog(){
-    correctList.innerHTML="";
-    wrongList.innerHTML="";
-    correct.forEach(v=>{
-        correctList.innerHTML += `<div class='wordItem'>${v.eng} = ${v.thai}<br><button onclick="removeCorrect('${v.eng}')">ลบ</button></div>`;
-    });
-    wrong.forEach(v=>{
-        wrongList.innerHTML += `<div class='wordItem'>${v.eng} = ${v.thai}</div>`;
-    });
-}
-function removeCorrect(word){
-    correct=correct.filter(x=>x.eng!=word);
-    saveLog(); loadLog();
-}
-</script>
-
-</body>
-</html>
